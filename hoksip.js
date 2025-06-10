@@ -1,7 +1,7 @@
+// hoksip.js
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
-// 資料庫位置
 const DB_PATH = path.join(__dirname, 'hoksip', 'hoksip.db');
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
@@ -11,7 +11,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
   }
 });
 
-// 初始化資料表
+// 初始化 sentences 表格（含 tts_url 欄位）
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS sentences (
@@ -36,20 +36,19 @@ db.serialize(() => {
   });
 });
 
-// 主物件封裝
 const hoksip = {
-  addSentence(user_id, original, translation, sub, tts_url = null, callback) {
-    const now = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
+  // 新增句子（tts_url 可為 null/空字串）
+  addSentence(user_id, original, translation, sub, tts_url = '', callback) {
+    const now = new Date().toISOString().split('T')[0];
     db.run(
       `INSERT INTO sentences (user_id, original, translation, sub, yesCount, exe_date, next_date, review_count, success_count, tts_url)
        VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?)`,
       [user_id, original, translation, sub, now, now, tts_url],
-      function (err) {
-        callback && callback(err, this && this.lastID);
-      }
+      function (err) { callback && callback(err, this && this.lastID); }
     );
   },
 
+  // 所有科目句子（給 debug / 批次查詢）
   getAllSentences(user_id, sub, callback) {
     db.all(
       `SELECT * FROM sentences WHERE user_id = ? AND sub = ? ORDER BY id ASC`,
@@ -58,21 +57,24 @@ const hoksip = {
     );
   },
 
+  // 【被動複習】抓今天到期的全部句子（next_date = 今天 && yesCount < 6），不分科
   getDueSentencesToday(user_id, callback) {
     const today = new Date().toISOString().split('T')[0];
     db.all(
-      `SELECT * FROM sentences WHERE user_id = ? AND next_date = ? AND yesCount < 6 ORDER BY next_date ASC, id ASC`,
+      `SELECT * FROM sentences WHERE user_id = ? AND next_date = ? AND yesCount < 6 ORDER BY sub ASC, id ASC`,
       [user_id, today],
       (err, rows) => callback(err, rows)
     );
   },
 
+  // 【主動複習】依科目，將同一 exe_date 分批（由近到遠）
   getSentencesByDateBatches(user_id, sub, callback) {
     db.all(
       'SELECT * FROM sentences WHERE user_id = ? AND sub = ? ORDER BY exe_date DESC, id ASC',
       [user_id, sub],
       (err, rows) => {
         if (err) return callback(err, null);
+        // 批次分組
         const batchMap = {};
         rows.forEach(row => {
           const date = row.exe_date;
@@ -86,6 +88,7 @@ const hoksip = {
     );
   },
 
+  // 回報複習結果（被動 isPassive=true，主動 isPassive=false）
   handleReviewResult(sentence_id, is_correct, isPassive, callback) {
     db.get(
       `SELECT yesCount FROM sentences WHERE id = ?`,
@@ -130,6 +133,7 @@ const hoksip = {
     );
   },
 
+  // 檢查科目有沒有重複
   checkSubExist(user_id, sub, callback) {
     db.get(
       `SELECT 1 FROM sentences WHERE user_id = ? AND sub = ? LIMIT 1`,
@@ -138,6 +142,7 @@ const hoksip = {
     );
   },
 
+  // 統計熟練度
   getStats(user_id, callback) {
     db.all(
       `SELECT sub, yesCount FROM sentences WHERE user_id = ?`,
@@ -156,6 +161,7 @@ const hoksip = {
     );
   },
 
+  // autocomplete用：取得目前所有科目
   getUserSubjects(user_id, callback) {
     db.all(
       `SELECT DISTINCT sub FROM sentences WHERE user_id = ?`,
