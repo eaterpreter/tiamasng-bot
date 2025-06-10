@@ -12,33 +12,44 @@ const commands = [
         .setDescription('科目名稱')
         .setRequired(true)
     ),
-  // 新增內容
+  // 新增內容（支援 autocomplete）
   new SlashCommandBuilder()
     .setName('study')
     .setDescription('開始新增學習內容')
     .addStringOption(option =>
       option.setName('subject')
-        .setDescription('科目名稱')
+        .setDescription('請選擇現有科目')
+        .setRequired(true)
+        .setAutocomplete(true)    // ★ 加這一行
+    )
+    .addStringOption(option =>
+      option.setName('content')
+        .setDescription('請輸入要加入的內容（原文｜翻譯）')
         .setRequired(true)
     ),
-  // 複習
+  // 主動複習（支援 autocomplete）
   new SlashCommandBuilder()
     .setName('review')
     .setDescription('主動複習指定科目')
     .addStringOption(option =>
       option.setName('subject')
-        .setDescription('科目名稱')
+        .setDescription('請選擇現有科目')
         .setRequired(true)
+        .setAutocomplete(true)    // ★ 加這一行
     ),
   // 統計
   new SlashCommandBuilder()
     .setName('stats')
-    .setDescription('顯示所有科目統計')
+    .setDescription('顯示所有科目統計'),
+  // 說明指令
+  new SlashCommandBuilder()
+    .setName('help')
+    .setDescription('說明與功能總覽')
 ].map(cmd => cmd.toJSON());
 
-// === 這裡請填你的 Bot ID 跟 Server ID ===
-const CLIENT_ID = '1324942256259469404'; // 就是你剛剛那串
-const GUILD_ID = '851389863315767337）';
+// === 填你的 Bot ID 跟 Server ID ===
+const CLIENT_ID = '1324942256259469404';
+const GUILD_ID = '851389863315767337';
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 

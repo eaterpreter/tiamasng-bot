@@ -1,4 +1,4 @@
-// index.js (支援 slash 指令 + 傳統訊息 + TTS + 排行榜 + 被動提醒)
+// index.js (支援 slash 指令 + autocomplete + 傳統訊息 + TTS + 排行榜 + 被動提醒)
 const sub2lang = {
   '日語': 'ja', '日文': 'ja', 'japanese': 'ja', 'ja': 'ja', 'japan': 'ja', 'nihonggo': 'ja', '日本語': 'ja', '日': 'ja',
   '德語': 'de', '德文': 'de', 'german': 'de', 'de': 'de', 'germany': 'de', 'deutsch': 'de', 'deutschland': 'de', '德': 'de',
@@ -176,11 +176,51 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// === Slash指令 & 按鈕互動 ===
+// === Slash指令、autocomplete、按鈕互動 ===
 client.on('interactionCreate', async interaction => {
+  // --- ★ autocomplete 支援科目下拉選單（review, study） ---
+  if (interaction.isAutocomplete()) {
+    const focusedValue = interaction.options.getFocused();
+    const userId = interaction.user.id;
+    // 取得使用者的所有科目
+    hoksip.getUserSubjects(userId, (err, subjects) => {
+      if (err) return interaction.respond([]);
+      // 只顯示有輸入內容的前 25 筆
+      const filtered = subjects
+        .filter(s => s && s.includes(focusedValue))
+        .slice(0, 25)
+        .map(s => ({ name: s, value: s }));
+      interaction.respond(filtered);
+    });
+    return;
+  }
+
   // 斜線指令
   if (interaction.isChatInputCommand()) {
     const { commandName, options, user } = interaction;
+    if (commandName === 'help') {
+      // /help 指令內容
+      return interaction.reply({
+        ephemeral: true, // 僅對自己顯示
+        content:
+`【Tiamasng 點仔算使用說明】
+本 bot 支援「打卡累積金幣」、「學習記錄」和「自動複習提醒」等多功能！
+
+🔹 **常用 Slash 指令：**
+/newsub 科目名稱    ➜ 新增一個新科目
+/study  科目名稱 內容（每行「原文｜翻譯」）  ➜ 新增學習內容
+/review 科目名稱     ➜ 主動複習指定科目
+/stats              ➜ 顯示所有科目統計
+
+🔹 **語音學習**：所有語言內容自動產生 TTS 語音，支援多語。
+🔹 **自動提醒**：每日 09:00、21:00 主動提醒複習。
+🔹 **音檔打卡**：傳 mp3/wav/m4a/ogg/flac 檔自動累積金幣與連續天數！
+
+🔹 **任何問題請 tag 管理員或 /help**
+
+—— Powered by Tiamasng 點仔算`
+      });
+    }
     if (commandName === 'newsub') {
       const sub = options.getString('subject', true);
       hoksip.checkSubExist(user.id, sub, (err, exist) => {
@@ -242,20 +282,16 @@ client.on('interactionCreate', async interaction => {
     return;
   }
 
-  // === 按鈕互動 ===
+  // === 按鈕互動（複習、TTS模式切換、可/不可等）=== 
   if (!interaction.isButton()) return;
-  const customId = interaction.customId;
-  // (後面保留原本複習/tts按鈕互動全都支援)
-  // ... 請保留你原本的複習/tts/按鈕處理程式碼 ...
-
-  // ...（略）...
-  // 請直接把你上面的「可/不可」那段拷貝過來，功能完全相容
+  // ...【這裡請貼你舊有的複習/tts 按鈕處理程式碼】...
+  // 保持原有互動行為
 });
 
 // 🟢 ready 事件：每日排行榜、複習提醒（同原本）
 client.once('ready', () => {
   console.log(`🤖 ${client.user.tag} 已上線！`);
-  // ... 英雄榜與自動複習提醒原本程式碼無須異動 ...
+  // ... 英雄榜與自動複習提醒原本程式碼請照貼 ...
 });
 
 client.login(process.env.TOKEN);
