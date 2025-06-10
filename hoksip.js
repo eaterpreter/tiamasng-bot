@@ -1,8 +1,7 @@
-// hoksip.js
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
-// 保證資料庫在 hoksip/hoksip.db
+// 資料庫位置
 const DB_PATH = path.join(__dirname, 'hoksip', 'hoksip.db');
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
@@ -12,7 +11,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
   }
 });
 
-// 初始化 sentences 表格（加 tts_url 欄位，請自行確保 schema 有加！）
+// 初始化資料表
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS sentences (
@@ -39,9 +38,6 @@ db.serialize(() => {
 
 // 主物件封裝
 const hoksip = {
-  /**
-   * 新增句子（建議把 tts_url 一起存進去）
-   */
   addSentence(user_id, original, translation, sub, tts_url = null, callback) {
     const now = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
     db.run(
@@ -54,9 +50,6 @@ const hoksip = {
     );
   },
 
-  /**
-   * 取得所有指定科目的句子（排序依ID）
-   */
   getAllSentences(user_id, sub, callback) {
     db.all(
       `SELECT * FROM sentences WHERE user_id = ? AND sub = ? ORDER BY id ASC`,
@@ -65,10 +58,6 @@ const hoksip = {
     );
   },
 
-  /**
-   * 被動複習：「所有科目」next_date=今天且未熟練（yesCount < 6），由 next_date 近到遠
-   * @returns callback(err, rows)，每一 row 都帶有 sub
-   */
   getDueSentencesToday(user_id, callback) {
     const today = new Date().toISOString().split('T')[0];
     db.all(
@@ -78,24 +67,18 @@ const hoksip = {
     );
   },
 
-  /**
-   * 主動複習：按科目、按天分批，由近到遠
-   * callback(err, [ { date: '2025-06-07', sentences: [...] }, ... ])
-   */
   getSentencesByDateBatches(user_id, sub, callback) {
     db.all(
       'SELECT * FROM sentences WHERE user_id = ? AND sub = ? ORDER BY exe_date DESC, id ASC',
       [user_id, sub],
       (err, rows) => {
         if (err) return callback(err, null);
-        // 分組（{日期: [row, row...]}）
         const batchMap = {};
         rows.forEach(row => {
           const date = row.exe_date;
           if (!batchMap[date]) batchMap[date] = [];
           batchMap[date].push(row);
         });
-        // 日期排序（新到舊）
         const sortedDates = Object.keys(batchMap).sort((a, b) => b.localeCompare(a));
         const batches = sortedDates.map(date => ({ date, sentences: batchMap[date] }));
         callback(null, batches);
@@ -103,10 +86,6 @@ const hoksip = {
     );
   },
 
-  /**
-   * 回報複習結果
-   * isPassive: true=被動提醒/記憶曲線, false=主動複習/只加review_count
-   */
   handleReviewResult(sentence_id, is_correct, isPassive, callback) {
     db.get(
       `SELECT yesCount FROM sentences WHERE id = ?`,
@@ -151,9 +130,6 @@ const hoksip = {
     );
   },
 
-  /**
-   * 檢查科目有沒有重複
-   */
   checkSubExist(user_id, sub, callback) {
     db.get(
       `SELECT 1 FROM sentences WHERE user_id = ? AND sub = ? LIMIT 1`,
@@ -162,9 +138,6 @@ const hoksip = {
     );
   },
 
-  /**
-   * 統計熟練度
-   */
   getStats(user_id, callback) {
     db.all(
       `SELECT sub, yesCount FROM sentences WHERE user_id = ?`,
@@ -183,9 +156,6 @@ const hoksip = {
     );
   },
 
-  /**
-   * autocomplete用：取得目前所有科目
-   */
   getUserSubjects(user_id, callback) {
     db.all(
       `SELECT DISTINCT sub FROM sentences WHERE user_id = ?`,

@@ -12,7 +12,7 @@ const sub2lang = {
 const hoksip = require('./hoksip.js');
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const fs = require('fs');
-const schedule = require('node-schedule');
+const googleTTS = require('googletrans'); // npm install unlimited-google-translate-api
 require('dotenv').config();
 
 // 工具：標準化顯示句子
@@ -36,7 +36,6 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-const audioExtensions = ['.mp3', '.wav', '.m4a', '.ogg', '.flac'];
 const userFile = './users.json';
 let users = {};
 if (fs.existsSync(userFile)) {
@@ -77,7 +76,7 @@ function addPointWithStreak(userId) {
   return { points: user.points, streakDay: user.streakDay, bonusGiven: bonus };
 }
 
-// === 傳統訊息打卡（省略，與原本相同）===
+// === 傳統訊息打卡（略） ===
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   // ... 省略原本內容 ...
@@ -134,7 +133,7 @@ client.on('interactionCreate', async interaction => {
       hoksip.checkSubExist(user.id, sub, (err, exist) => {
         if (err) return interaction.reply('檢查科目時發生錯誤');
         if (exist) return interaction.reply('已經有這個科目了，換個名稱吧');
-        hoksip.addSentence(user.id, '[placeholder]', '', sub, () => {
+        hoksip.addSentence(user.id, '[placeholder]', '', sub, '', () => {
           interaction.reply(`✅ 已新增科目「${sub}」！可用 /study ${sub} 新增內容`);
         });
       });
@@ -148,15 +147,21 @@ client.on('interactionCreate', async interaction => {
       if (!ttsLang) return interaction.reply(`⚠️ 不支援「${sub}」的語音，請聯絡管理員新增語言！`);
       let added = 0;
       // 支援多種分隔符
-      content.split('\n').forEach(line => {
-        let [original, translation = ''] = line.split(/[|｜:：\t、/~]/).map(x => x.trim());
-        if (original) {
-          hoksip.addSentence(user.id, original, translation, sub, ttsLang, () => {});
-          added++;
+      (async () => {
+        for (const line of content.split('\n')) {
+          let [original, translation = ''] = line.split(/[|｜:：\t、/~]/).map(x => x.trim());
+          if (original) {
+            let tts_url = '';
+            try {
+              tts_url = googletrans.textToSpeechUrl(original, { lang: ttsLang });
+            } catch (e) { tts_url = ''; }
+            await hoksip.addSentence(user.id, original, translation, sub, tts_url, () => {});
+            added++;
+          }
         }
-      });
-      addPointWithStreak(user.id);
-      interaction.reply(`✅ 已新增 ${added} 筆到科目「${sub}」！`);
+        addPointWithStreak(user.id);
+        interaction.reply(`✅ 已新增 ${added} 筆到科目「${sub}」！`);
+      })();
     }
 
     // /review
@@ -255,7 +260,7 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// ===== 輸出複習題卡（自動語音/分隔符/按鈕/結束處理）=====
+// ===== 輸出複習題卡 =====
 async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, useReplyInsteadOfFollowup) {
   const row = batch.sentences[idx];
   const embed = new EmbedBuilder()
@@ -283,10 +288,10 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
   if (batchFinishCallback) interaction._batchFinishCallback = batchFinishCallback;
 }
 
-// === ready 事件（排行榜與提醒照原本寫法）===
+// === ready 事件（排行榜與提醒請照原本寫法即可） ===
 client.once('ready', () => {
   console.log(`🤖 ${client.user.tag} 已上線！`);
-  // ... 你的排行榜與自動複習提醒原本寫法 ...
+  // ... 你的排行榜與自動複習提醒 code ...
 });
 
 client.login(process.env.TOKEN);
