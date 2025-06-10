@@ -224,7 +224,10 @@ client.on('interactionCreate', async interaction => {
       hoksip.checkSubExist(user.id, sub, (err, exist) => {
         if (err) return interaction.reply('檢查科目時發生錯誤');
         if (exist) return interaction.reply('已經有這個科目了，換個名稱吧');
-        interaction.reply(`✅ 已新增科目「${sub}」！可用 /study ${sub} 新增內容`);
+        // 直接塞一筆 placeholder 句子，確保 autocomplete 能抓到
+          hoksip.addSentence(user.id, '[placeholder]', '', sub, () => {
+            interaction.reply(`✅ 已新增科目「${sub}」！可用 /study ${sub} 新增內容`);
+        });
       });
     }
     else if (commandName === 'study') {
