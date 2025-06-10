@@ -1,6 +1,5 @@
 // index.js (支援 slash 指令 + autocomplete + TTS + 排行榜 + 被動提醒)
 const sub2lang = {
-  // ...（語言表原樣即可，不貼太長省空間）...
   '日語': 'ja', '日文': 'ja', 'japanese': 'ja', 'ja': 'ja', 'japan': 'ja', 'nihonggo': 'ja', '日本語': 'ja', '日': 'ja',
   '德語': 'de', '德文': 'de', 'german': 'de', 'de': 'de', 'germany': 'de', 'deutsch': 'de', 'deutschland': 'de', '德': 'de',
   '英文': 'en', '英語': 'en', 'english': 'en', 'en': 'en', 'america': 'en', '英': 'en',
@@ -13,17 +12,14 @@ const sub2lang = {
 const hoksip = require('./hoksip.js');
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const fs = require('fs');
-const path = require('path');
 const schedule = require('node-schedule');
 require('dotenv').config();
 
-// ===== 工具：標準化顯示句子 =====
+// 工具：標準化顯示句子
 function displaySentence(row) {
-  // 有翻譯且與原文不同時，合併一行
   if (row.translation && row.translation.trim() && row.translation !== row.original) {
     return `${row.original}｜${row.translation}`;
   }
-  // 否則多行
   return `${row.original}\n${row.translation || ''}`;
 }
 
@@ -81,9 +77,10 @@ function addPointWithStreak(userId) {
   return { points: user.points, streakDay: user.streakDay, bonusGiven: bonus };
 }
 
-// === 訊息傳統指令（省略） ===
+// === 傳統訊息打卡（省略，與原本相同）===
 client.on('messageCreate', async (message) => {
-  // ...你的舊訊息指令不用動...
+  if (message.author.bot) return;
+  // ... 省略原本內容 ...
 });
 
 // === Slash指令、autocomplete、按鈕互動 ===
@@ -106,9 +103,11 @@ client.on('interactionCreate', async interaction => {
   // --- Slash 指令 ---
   if (interaction.isChatInputCommand()) {
     const { commandName, options, user } = interaction;
+
+    // /help
     if (commandName === 'help') {
       return interaction.reply({
-        ephemeral: false,
+        ephemeral: false,  // 全員可見
         content:
 `【Tiamasng 點仔算使用說明】
 本 bot 支援「打卡累積金幣」、「學習記錄」和「自動複習提醒」等多功能！
@@ -128,6 +127,8 @@ client.on('interactionCreate', async interaction => {
 —— Powered by Tiamasng 點仔算`
       });
     }
+
+    // /newsub
     if (commandName === 'newsub') {
       const sub = options.getString('subject', true);
       hoksip.checkSubExist(user.id, sub, (err, exist) => {
@@ -138,33 +139,37 @@ client.on('interactionCreate', async interaction => {
         });
       });
     }
+
+    // /study
     else if (commandName === 'study') {
       const sub = options.getString('subject', true);
       const content = options.getString('content', true);
       const ttsLang = sub2lang[sub];
       if (!ttsLang) return interaction.reply(`⚠️ 不支援「${sub}」的語音，請聯絡管理員新增語言！`);
       let added = 0;
+      // 支援多種分隔符
       content.split('\n').forEach(line => {
-        let [original, translation = ''] = line.split(/[|｜:：\t、/，,~]/).map(x => x.trim());
+        let [original, translation = ''] = line.split(/[|｜:：\t、/~]/).map(x => x.trim());
         if (original) {
-          hoksip.addSentence(user.id, original, translation, sub, () => {});
+          hoksip.addSentence(user.id, original, translation, sub, ttsLang, () => {});
           added++;
         }
       });
       addPointWithStreak(user.id);
       interaction.reply(`✅ 已新增 ${added} 筆到科目「${sub}」！`);
     }
+
+    // /review
     else if (commandName === 'review') {
       const sub = options.getString('subject', true);
       await interaction.reply(`開始複習科目【${sub}】，請稍候...`);
       hoksip.getSentencesByDateBatches(user.id, sub, async (err, batches) => {
         if (err) return interaction.followUp('查詢失敗');
         if (!batches.length) return interaction.followUp('目前沒有任何內容可以複習！');
-        // ====== 複習多天全部批次由近到遠 ======
+        // ========== 由近至遠，全部批次都複習 ==========
         let batchIdx = 0;
         function reviewBatch() {
           if (batchIdx >= batches.length) {
-            // 全部複習完
             return interaction.followUp({
               embeds: [new EmbedBuilder()
                 .setTitle(`複習結束！`)
@@ -182,7 +187,6 @@ client.on('interactionCreate', async interaction => {
             return reviewBatch();
           }
           sendReviewQuestion(interaction, user.id, sub, 0, batch, batches.length, () => {
-            // 使用 callback 控制進下一天
             batchIdx++;
             reviewBatch();
           });
@@ -190,6 +194,8 @@ client.on('interactionCreate', async interaction => {
         reviewBatch();
       });
     }
+
+    // /stats
     else if (commandName === 'stats') {
       hoksip.getStats(user.id, (err, stats) => {
         if (err) return interaction.reply('統計查詢失敗');
@@ -243,7 +249,7 @@ client.on('interactionCreate', async interaction => {
     }
     // 結束按鈕
     else if (interaction.customId === 'review_done') {
-      await interaction.update({ content: '複習已結束，請繼續加油！', embeds: [], components: [] });
+      await interaction.reply({ content: '複習已結束，請繼續加油！', embeds: [], components: [] });
     }
     return;
   }
@@ -263,22 +269,24 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
       .setLabel('可 ✅').setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`review_no_${userId}_${sub}_${batch.date}_${idx}`)
-      .setLabel('不可 ❌').setStyle(ButtonStyle.Danger)
+      .setLabel('不可 ❌').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('review_done')
+      .setLabel('結束').setStyle(ButtonStyle.Primary)
   );
-  // 支援 .reply 或 .followUp 交錯
   if (useReplyInsteadOfFollowup && interaction.replied === false) {
     await interaction.reply({ embeds: [embed], components: [rowBtn], ephemeral: false });
   } else {
-    await interaction.followUp({ embeds: [embed], components: [rowBtn], ephemeral: false });
+    await interaction.update({ embeds: [embed], components: [rowBtn], ephemeral: false });
   }
-  // 存 callback 讓按鈕可以呼叫
+  // 存 callback 讓按鈕可以呼叫（進下一天）
   if (batchFinishCallback) interaction._batchFinishCallback = batchFinishCallback;
 }
 
-// === ready 事件（排行榜與提醒請照原本寫法即可） ===
+// === ready 事件（排行榜與提醒照原本寫法）===
 client.once('ready', () => {
   console.log(`🤖 ${client.user.tag} 已上線！`);
-  // ... 你的排行榜與自動複習提醒 code ...
+  // ... 你的排行榜與自動複習提醒原本寫法 ...
 });
 
 client.login(process.env.TOKEN);
