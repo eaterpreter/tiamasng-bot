@@ -108,7 +108,7 @@ client.on('interactionCreate', async interaction => {
     const { commandName, options, user } = interaction;
     if (commandName === 'help') {
       return interaction.reply({
-        ephemeral: true,
+        ephemeral: false,
         content:
 `【Tiamasng 點仔算使用說明】
 本 bot 支援「打卡累積金幣」、「學習記錄」和「自動複習提醒」等多功能！
