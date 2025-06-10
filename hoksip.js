@@ -39,7 +39,6 @@ db.serialize(() => {
 
 // 封裝對外 API
 const hoksip = {
-
   // 新增句子
   addSentence(user_id, original, translation, sub, callback) {
     const now = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
@@ -48,7 +47,7 @@ const hoksip = {
        VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0)`,
       [user_id, original, translation, sub, now, now],
       function (err) {
-        callback(err, this.lastID);
+        callback && callback(err, this && this.lastID);
       }
     );
   },
@@ -78,7 +77,7 @@ const hoksip = {
       `SELECT yesCount FROM sentences WHERE id = ?`,
       [sentence_id],
       (err, row) => {
-        if (err || !row) return callback(err || new Error('找不到句子'));
+        if (err || !row) return callback && callback(err || new Error('找不到句子'));
 
         let yesCount = row.yesCount;
         let updateSql, next_date;
@@ -87,7 +86,6 @@ const hoksip = {
         if (isPassive) {
           if (is_correct) yesCount = Math.min(yesCount + 1, 6);
           else yesCount = 0;
-
           const INTERVAL_RULES = [1, 2, 3, 5, 7, 10];
           const idx = Math.min(yesCount, INTERVAL_RULES.length - 1);
           next_date = new Date(Date.now() + INTERVAL_RULES[idx] * 86400000)
@@ -112,7 +110,7 @@ const hoksip = {
           isPassive
             ? [yesCount, today, next_date, is_correct ? 1 : 0, sentence_id]
             : [sentence_id],
-          (err) => callback(err)
+          (err) => callback && callback(err)
         );
       }
     );
@@ -134,7 +132,6 @@ const hoksip = {
       [user_id],
       (err, rows) => {
         if (err) return callback(err);
-
         const result = {};
         for (let row of rows) {
           if (!result[row.sub]) result[row.sub] = { not_familiar: 0, vague: 0, mastered: 0 };
@@ -147,7 +144,7 @@ const hoksip = {
     );
   },
 
-  // 取得科目清單（給 autocomplete 用！）
+  // 取得現有科目清單（Autocomplete用）
   getUserSubjects(user_id, callback) {
     db.all(
       `SELECT DISTINCT sub FROM sentences WHERE user_id = ?`,
@@ -158,7 +155,7 @@ const hoksip = {
         callback(null, subjects);
       }
     );
-  },
+  }
 };
 
 module.exports = hoksip;
