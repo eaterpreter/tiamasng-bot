@@ -1,12 +1,76 @@
 {
   "417737364396572672": {
-    "points": 1,
-    "streakDay": 1,
-    "lastCheckInDate": "2025-05-16",
-    "todayBonusGiven": true,
+    "points": 2,
+    "streakDay": 2,
+    "lastCheckInDate": "2025-05-17",
+    "todayBonusGiven": false,
     "history": [
       {
         "timestamp": "2025-05-16T07:43:06.885Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-05-17T03:39:57.561Z",
+        "delta": 1
+      }
+    ]
+  },
+  "370210449037459476": {
+    "points": 1,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-05-21",
+    "todayBonusGiven": true,
+    "history": [
+      {
+        "timestamp": "2025-05-21T13:48:56.602Z",
+        "delta": 1
+      }
+    ]
+  },
+  "339807243409293312": {
+    "points": 1,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-05-21",
+    "todayBonusGiven": true,
+    "history": [
+      {
+        "timestamp": "2025-05-21T13:50:34.484Z",
+        "delta": 1
+      }
+    ]
+  },
+  "668774816085704704": {
+    "points": 1,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-05-21",
+    "todayBonusGiven": true,
+    "history": [
+      {
+        "timestamp": "2025-05-21T13:50:43.808Z",
+        "delta": 1
+      }
+    ]
+  },
+  "858330955387371550": {
+    "points": 1,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-05-21",
+    "todayBonusGiven": true,
+    "history": [
+      {
+        "timestamp": "2025-05-21T14:55:46.318Z",
+        "delta": 1
+      }
+    ]
+  },
+  "582631390013554699": {
+    "points": 1,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-05-21",
+    "todayBonusGiven": true,
+    "history": [
+      {
+        "timestamp": "2025-05-21T14:57:17.779Z",
         "delta": 1
       }
     ]

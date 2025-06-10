@@ -12,6 +12,8 @@
   "dependencies": {
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
-    "node-schedule": "^2.1.1"
+    "google-tts-api": "^2.0.2",
+    "node-schedule": "^2.1.1",
+    "sqlite3": "^5.1.7"
   }
 }
