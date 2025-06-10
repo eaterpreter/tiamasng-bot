@@ -169,6 +169,7 @@ client.on('interactionCreate', async interaction => {
       const sub = options.getString('subject', true);
       await interaction.reply(`開始複習科目【${sub}】，請稍候...`);
       hoksip.getSentencesByDateBatches(user.id, sub, async (err, batches) => {
+        console.log("查到的批次 batches:", batches);
         if (err) return interaction.followUp('查詢失敗');
         if (!batches.length) return interaction.followUp('目前沒有任何內容可以複習！');
         // ========== 由近至遠，全部批次都複習 ==========
