@@ -425,6 +425,7 @@ client.once('ready', () => {
   console.log(`🤖 ${client.user.tag} 已上線！`);
 
   // === 英雄榜自動推播 ===
+
   schedule.scheduleJob('0 9 * * *', () => {
     const now = new Date();
     const rangeStart = new Date(now);

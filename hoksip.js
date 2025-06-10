@@ -37,11 +37,9 @@ db.serialize(() => {
   });
 });
 
-// 封裝對外 API（僅簡易版）
+// 封裝對外 API
 const hoksip = {
 
-  // 新增科目不用進 DB，只要確認有沒有已存在的sub（搭配新增句子時檢查）
-  
   // 新增句子
   addSentence(user_id, original, translation, sub, callback) {
     const now = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
@@ -76,7 +74,6 @@ const hoksip = {
 
   // 回報複習結果
   handleReviewResult(sentence_id, is_correct, isPassive, callback) {
-    // 先查原本 yesCount
     db.get(
       `SELECT yesCount FROM sentences WHERE id = ?`,
       [sentence_id],
@@ -88,13 +85,9 @@ const hoksip = {
         const today = new Date().toISOString().split('T')[0];
 
         if (isPassive) {
-          // 被動提醒才會進行記憶曲線
-          if (is_correct) {
-            yesCount = Math.min(yesCount + 1, 6);
-          } else {
-            yesCount = 0;
-          }
-          // INTERVAL_RULES
+          if (is_correct) yesCount = Math.min(yesCount + 1, 6);
+          else yesCount = 0;
+
           const INTERVAL_RULES = [1, 2, 3, 5, 7, 10];
           const idx = Math.min(yesCount, INTERVAL_RULES.length - 1);
           next_date = new Date(Date.now() + INTERVAL_RULES[idx] * 86400000)
@@ -107,7 +100,6 @@ const hoksip = {
             WHERE id = ?
           `;
         } else {
-          // 主動複習，只加 review_count，不變動 yesCount/next_date
           updateSql = `
             UPDATE sentences
             SET review_count = review_count + 1
@@ -143,7 +135,6 @@ const hoksip = {
       (err, rows) => {
         if (err) return callback(err);
 
-        // 分組統計
         const result = {};
         for (let row of rows) {
           if (!result[row.sub]) result[row.sub] = { not_familiar: 0, vague: 0, mastered: 0 };
@@ -152,6 +143,19 @@ const hoksip = {
           else result[row.sub].mastered++;
         }
         callback(null, result);
+      }
+    );
+  },
+
+  // 取得科目清單（給 autocomplete 用！）
+  getUserSubjects(user_id, callback) {
+    db.all(
+      `SELECT DISTINCT sub FROM sentences WHERE user_id = ?`,
+      [user_id],
+      (err, rows) => {
+        if (err) return callback(err, []);
+        const subjects = rows.map(r => r.sub);
+        callback(null, subjects);
       }
     );
   },
