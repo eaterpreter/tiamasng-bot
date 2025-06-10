@@ -1,5 +1,6 @@
-// index.js (支援 slash 指令 + autocomplete + 傳統訊息 + TTS + 排行榜 + 被動提醒)
+// index.js (支援 slash 指令 + autocomplete + TTS + 排行榜 + 被動提醒)
 const sub2lang = {
+  // ...（語言表原樣即可，不貼太長省空間）...
   '日語': 'ja', '日文': 'ja', 'japanese': 'ja', 'ja': 'ja', 'japan': 'ja', 'nihonggo': 'ja', '日本語': 'ja', '日': 'ja',
   '德語': 'de', '德文': 'de', 'german': 'de', 'de': 'de', 'germany': 'de', 'deutsch': 'de', 'deutschland': 'de', '德': 'de',
   '英文': 'en', '英語': 'en', 'english': 'en', 'en': 'en', 'america': 'en', '英': 'en',
@@ -16,6 +17,17 @@ const path = require('path');
 const schedule = require('node-schedule');
 require('dotenv').config();
 
+// ===== 工具：標準化顯示句子 =====
+function displaySentence(row) {
+  // 有翻譯且與原文不同時，合併一行
+  if (row.translation && row.translation.trim() && row.translation !== row.original) {
+    return `${row.original}｜${row.translation}`;
+  }
+  // 否則多行
+  return `${row.original}\n${row.translation || ''}`;
+}
+
+// === Discord bot 基本設定 ===
 console.log("🔑 目前讀到的 TOKEN：", process.env.TOKEN);
 console.log("✅ 準備連接 Discord...");
 
@@ -69,9 +81,9 @@ function addPointWithStreak(userId) {
   return { points: user.points, streakDay: user.streakDay, bonusGiven: bonus };
 }
 
-// === 傳統訊息：可兼容舊指令 ===
+// === 訊息傳統指令（省略） ===
 client.on('messageCreate', async (message) => {
-  // ...（不變，省略）
+  // ...你的舊訊息指令不用動...
 });
 
 // === Slash指令、autocomplete、按鈕互動 ===
@@ -121,7 +133,6 @@ client.on('interactionCreate', async interaction => {
       hoksip.checkSubExist(user.id, sub, (err, exist) => {
         if (err) return interaction.reply('檢查科目時發生錯誤');
         if (exist) return interaction.reply('已經有這個科目了，換個名稱吧');
-        // 塞一筆 placeholder 句子，autocomplete 才抓得到
         hoksip.addSentence(user.id, '[placeholder]', '', sub, () => {
           interaction.reply(`✅ 已新增科目「${sub}」！可用 /study ${sub} 新增內容`);
         });
@@ -134,7 +145,7 @@ client.on('interactionCreate', async interaction => {
       if (!ttsLang) return interaction.reply(`⚠️ 不支援「${sub}」的語音，請聯絡管理員新增語言！`);
       let added = 0;
       content.split('\n').forEach(line => {
-        let [original, translation = ''] = line.split(/[|｜:：\t、/，,\s~]/).map(x => x.trim());
+        let [original, translation = ''] = line.split(/[|｜:：\t、/，,~]/).map(x => x.trim());
         if (original) {
           hoksip.addSentence(user.id, original, translation, sub, () => {});
           added++;
@@ -149,13 +160,34 @@ client.on('interactionCreate', async interaction => {
       hoksip.getSentencesByDateBatches(user.id, sub, async (err, batches) => {
         if (err) return interaction.followUp('查詢失敗');
         if (!batches.length) return interaction.followUp('目前沒有任何內容可以複習！');
-
-        // 只出最新一天（可根據需求更改批次邏輯）
-        const batch = batches[0];
-        if (!batch || !batch.sentences.length) return interaction.followUp('沒有可複習的內容！');
-
-        // 發送第一題（卡片+按鈕）
-        sendReviewQuestion(interaction, user.id, sub, 0, batch, batches.length, 0, false); // 首題
+        // ====== 複習多天全部批次由近到遠 ======
+        let batchIdx = 0;
+        function reviewBatch() {
+          if (batchIdx >= batches.length) {
+            // 全部複習完
+            return interaction.followUp({
+              embeds: [new EmbedBuilder()
+                .setTitle(`複習結束！`)
+                .setDescription(`全部內容都已複習完畢。`)
+                .setFooter({ text: '點仔算 Tiamasng' })],
+              components: [new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('review_done').setLabel('結束').setStyle(ButtonStyle.Primary)
+              )],
+              ephemeral: false
+            });
+          }
+          const batch = batches[batchIdx];
+          if (!batch || !batch.sentences.length) {
+            batchIdx++;
+            return reviewBatch();
+          }
+          sendReviewQuestion(interaction, user.id, sub, 0, batch, batches.length, () => {
+            // 使用 callback 控制進下一天
+            batchIdx++;
+            reviewBatch();
+          });
+        }
+        reviewBatch();
       });
     }
     else if (commandName === 'stats') {
@@ -172,15 +204,15 @@ client.on('interactionCreate', async interaction => {
     return;
   }
 
-  // === 按鈕互動（主動複習/結束）===
+  // === 按鈕互動 ===
   if (interaction.isButton()) {
     const id = interaction.customId;
+    // 答題按鈕
     if (id.startsWith('review_yes_') || id.startsWith('review_no_')) {
-      const [flag, , userId, sub, date, idxStr, batchIdxStr] = id.split('_');
+      const [flag, , userId, sub, date, idxStr] = id.split('_');
       if (interaction.user.id !== userId) return interaction.reply({ content: '這不是你的複習！', ephemeral: true });
       const isCorrect = id.startsWith('review_yes_');
       const idx = Number(idxStr);
-      const batchIdx = Number(batchIdxStr);
 
       hoksip.getSentencesByDateBatches(userId, sub, async (err, batches) => {
         if (err) return interaction.reply('查詢失敗');
@@ -190,23 +222,26 @@ client.on('interactionCreate', async interaction => {
         hoksip.handleReviewResult(row.id, isCorrect, false, () => {});
 
         if (idx + 1 < batch.sentences.length) {
-          await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, batchIdx, true); // isButton = true
-        } else if (batchIdx + 1 < batches.length) {
-          await sendReviewQuestion(interaction, userId, sub, 0, batches[batchIdx + 1], batches.length, batchIdx + 1, true);
+          await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, null, true);
         } else {
-          const endEmbed = new EmbedBuilder()
-            .setTitle(`複習結束！`)
-            .setDescription(`科目【${sub}】本批（${date}）已複習完畢！`)
-            .setFooter({ text: '點仔算 Tiamasng' });
-          const rowBtn = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId('review_done')
-              .setLabel('結束').setStyle(ButtonStyle.Primary)
-          );
-          await interaction.reply({ embeds: [endEmbed], components: [rowBtn], ephemeral: false });
+          // 本批次已結束，呼叫 callback 進下一天
+          if (typeof interaction._batchFinishCallback === 'function') {
+            return interaction._batchFinishCallback();
+          }
+          // fallback: 顯示已結束
+          await interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setTitle(`複習結束！`)
+              .setDescription(`本批（${date}）已複習完畢。`)
+              .setFooter({ text: '點仔算 Tiamasng' })],
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId('review_done').setLabel('結束').setStyle(ButtonStyle.Primary)
+            )]
+          });
         }
       });
     }
+    // 結束按鈕
     else if (interaction.customId === 'review_done') {
       await interaction.update({ content: '複習已結束，請繼續加油！', embeds: [], components: [] });
     }
@@ -214,36 +249,36 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// ==== 出題卡片函式 ====
-async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchIdx, isButton) {
+// ===== 輸出複習題卡（自動語音/分隔符/按鈕/結束處理）=====
+async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, useReplyInsteadOfFollowup) {
   const row = batch.sentences[idx];
   const embed = new EmbedBuilder()
     .setTitle(`【複習 ${sub}】${batch.date} (${idx + 1}/${batch.sentences.length})`)
-    .setDescription(`${row.original}\n${row.translation}`)
-    .setFooter({ text: `本批次共 ${batch.sentences.length} 句，${totalBatches > 1 ? `還有 ${totalBatches - batchIdx - 1} 批較舊內容` : '已是最舊批次'}` });
+    .setDescription(`${displaySentence(row)}${row.tts_url ? `\n[🔊 語音播放連結](${row.tts_url})` : ''}`)
+    .setFooter({ text: `本批次共 ${batch.sentences.length} 句，${totalBatches > 1 ? `還有 ${totalBatches-1} 批較舊內容` : '已是最舊批次'}` });
 
   const rowBtn = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`review_yes_${userId}_${sub}_${batch.date}_${idx}_${batchIdx}`)
+      .setCustomId(`review_yes_${userId}_${sub}_${batch.date}_${idx}`)
       .setLabel('可 ✅').setStyle(ButtonStyle.Success),
     new ButtonBuilder()
-      .setCustomId(`review_no_${userId}_${sub}_${batch.date}_${idx}_${batchIdx}`)
+      .setCustomId(`review_no_${userId}_${sub}_${batch.date}_${idx}`)
       .setLabel('不可 ❌').setStyle(ButtonStyle.Danger)
   );
-
-  if (isButton) {
-    // 按鈕互動: update
-    await interaction.update({ embeds: [embed], components: [rowBtn] });
+  // 支援 .reply 或 .followUp 交錯
+  if (useReplyInsteadOfFollowup && interaction.replied === false) {
+    await interaction.reply({ embeds: [embed], components: [rowBtn], ephemeral: false });
   } else {
-    // 首次/指令互動: editReply
-    await interaction.editReply({ embeds: [embed], components: [rowBtn], content: null });
+    await interaction.followUp({ embeds: [embed], components: [rowBtn], ephemeral: false });
   }
+  // 存 callback 讓按鈕可以呼叫
+  if (batchFinishCallback) interaction._batchFinishCallback = batchFinishCallback;
 }
 
-// === ready 事件 ===
+// === ready 事件（排行榜與提醒請照原本寫法即可） ===
 client.once('ready', () => {
   console.log(`🤖 ${client.user.tag} 已上線！`);
-  // ... 英雄榜與自動複習提醒原本程式碼照貼 ...
+  // ... 你的排行榜與自動複習提醒 code ...
 });
 
 client.login(process.env.TOKEN);

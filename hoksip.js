@@ -12,7 +12,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
   }
 });
 
-// 初始化 sentences 表格
+// 初始化 sentences 表格（加 tts_url 欄位，請自行確保 schema 有加！）
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS sentences (
@@ -25,7 +25,8 @@ db.serialize(() => {
       exe_date TEXT,
       next_date TEXT,
       review_count INTEGER DEFAULT 0,
-      success_count INTEGER DEFAULT 0
+      success_count INTEGER DEFAULT 0,
+      tts_url TEXT
     )
   `, (err) => {
     if (err) {
@@ -39,14 +40,14 @@ db.serialize(() => {
 // 主物件封裝
 const hoksip = {
   /**
-   * 新增句子
+   * 新增句子（建議把 tts_url 一起存進去）
    */
-  addSentence(user_id, original, translation, sub, callback) {
+  addSentence(user_id, original, translation, sub, tts_url = null, callback) {
     const now = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
     db.run(
-      `INSERT INTO sentences (user_id, original, translation, sub, yesCount, exe_date, next_date, review_count, success_count)
-       VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0)`,
-      [user_id, original, translation, sub, now, now],
+      `INSERT INTO sentences (user_id, original, translation, sub, yesCount, exe_date, next_date, review_count, success_count, tts_url)
+       VALUES (?, ?, ?, ?, 0, ?, ?, 0, 0, ?)`,
+      [user_id, original, translation, sub, now, now, tts_url],
       function (err) {
         callback && callback(err, this && this.lastID);
       }
@@ -65,19 +66,20 @@ const hoksip = {
   },
 
   /**
-   * 被動複習：取得 today 以前 next_date 未熟練（yesCount < 6）的句子（照 next_date 由近到遠）
+   * 被動複習：「所有科目」next_date=今天且未熟練（yesCount < 6），由 next_date 近到遠
+   * @returns callback(err, rows)，每一 row 都帶有 sub
    */
-  getDueSentences(user_id, sub, callback) {
+  getDueSentencesToday(user_id, callback) {
     const today = new Date().toISOString().split('T')[0];
     db.all(
-      `SELECT * FROM sentences WHERE user_id = ? AND sub = ? AND next_date <= ? AND yesCount < 6 ORDER BY next_date ASC`,
-      [user_id, sub, today],
+      `SELECT * FROM sentences WHERE user_id = ? AND next_date = ? AND yesCount < 6 ORDER BY next_date ASC, id ASC`,
+      [user_id, today],
       (err, rows) => callback(err, rows)
     );
   },
 
   /**
-   * 主動複習用：將同一 exe_date 的句子分批，由近到遠
+   * 主動複習：按科目、按天分批，由近到遠
    * callback(err, [ { date: '2025-06-07', sentences: [...] }, ... ])
    */
   getSentencesByDateBatches(user_id, sub, callback) {
@@ -100,7 +102,6 @@ const hoksip = {
       }
     );
   },
-  
 
   /**
    * 回報複習結果
