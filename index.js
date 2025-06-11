@@ -273,9 +273,27 @@ client.on('interactionCreate', async interaction => {
         let added = 0;
         let errors = 0;
         
-        for (const line of content.split('\n')) {
+        // First try to split by explicit line breaks
+        let lines = content.split(/\r?\n/);
+        
+        // If no explicit line breaks found, try to detect natural line breaks
+        if (lines.length === 1) {
+          // Look for patterns like "word (reading) translation" or "word translation"
+          lines = content.match(/[^\n]+?(?=\s*[^\n]+?(?:\s|$))/g) || [content];
+        }
+        
+        // Filter out empty lines and process each line
+        lines = lines.filter(line => line.trim());
+        
+        for (const line of lines) {
           // Split by any separator except commas, and trim each part
           let [original, translation = ''] = line.split(/[|｜:：\t、/~]/).map(x => x.trim());
+          
+          // If no separator found, try to split by space
+          if (!translation && original.includes(' ')) {
+            [original, translation] = original.split(/\s+/).map(x => x.trim());
+          }
+          
           if (original) {
             try {
               await new Promise((resolve, reject) => {
