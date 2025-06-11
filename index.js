@@ -515,7 +515,7 @@ client.on('interactionCreate', async interaction => {
                 // Wait a moment before showing the next question
                 setTimeout(async () => {
                   try {
-                    await sendReviewQuestion(interaction, userId, sub, Number(idxStr) + 1, batch, batches.length, null, true);
+                    await sendReviewQuestion(interaction, userId, sub, Number(idxStr) + 1, batch, batches.length, null, true, true);
                   } catch (err) {
                     console.error('Error sending next question:', err);
                     await interaction.channel.send('❌ 發送下一題時發生錯誤');
@@ -529,7 +529,7 @@ client.on('interactionCreate', async interaction => {
                   setTimeout(async () => {
                     try {
                       const nextBatch = batches[currentBatchIndex + 1];
-                      await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true);
+                      await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true, true);
                     } catch (err) {
                       console.error('Error sending next batch:', err);
                       await interaction.channel.send('❌ 發送下一批時發生錯誤');
@@ -681,16 +681,16 @@ client.on('interactionCreate', async interaction => {
 });
 
 // ===== 輸出複習題卡 =====
-async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, isButtonInteraction) {
+async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, isButtonInteraction, isAfterDelete = false) {
   if (!batch || !batch.sentences || idx >= batch.sentences.length) {
-    if (isButtonInteraction) {
+    if (isButtonInteraction && !isAfterDelete) {
       await interaction.update({ 
         content: '❌ 無效的複習內容',
         embeds: [],
         components: []
       });
     } else {
-      await interaction.followUp({ content: '❌ 無效的複習內容' });
+      await interaction.channel.send({ content: '❌ 無效的複習內容' });
     }
     return;
   }
@@ -721,15 +721,15 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
   );
 
   try {
-    if (isButtonInteraction) {
+    if (isButtonInteraction && !isAfterDelete) {
       // For button interactions, update the existing message
       await interaction.update({ 
         embeds: [embed], 
         components: [rowBtn] 
       });
     } else {
-      // For initial command, use followUp
-      await interaction.followUp({ 
+      // For initial command or after deletion, send a new message
+      await interaction.channel.send({ 
         embeds: [embed], 
         components: [rowBtn] 
       });
@@ -737,14 +737,14 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
     if (batchFinishCallback) interaction._batchFinishCallback = batchFinishCallback;
   } catch (err) {
     console.error('Error sending review question:', err);
-    if (isButtonInteraction) {
+    if (isButtonInteraction && !isAfterDelete) {
       await interaction.update({ 
         content: '❌ 發送複習題目時發生錯誤',
         embeds: [],
         components: []
       });
     } else {
-      await interaction.followUp({ content: '❌ 發送複習題目時發生錯誤' });
+      await interaction.channel.send({ content: '❌ 發送複習題目時發生錯誤' });
     }
   }
 }
@@ -900,10 +900,22 @@ function timeout(ms) {
 // Add validation for review button IDs
 function validateReviewButtonId(id) {
   const parts = id.split('_');
-  if (parts.length !== 6) return false;
-  const [flag, , userId, sub, date, idxStr] = parts;
-  if (!['review_yes', 'review_no', 'review_delete'].includes(flag)) return false;
-  if (!userId || !sub || !date || isNaN(Number(idxStr))) return false;
+  // The format is: review_yes_userId_sub_date_idx
+  // or: review_no_userId_sub_date_idx
+  // or: review_delete_userId_sub_date_idx
+  if (parts.length !== 6) {
+    console.log('Invalid parts length:', parts.length, parts);
+    return false;
+  }
+  const [flag, action, userId, sub, date, idxStr] = parts;
+  if (!['review_yes', 'review_no', 'review_delete'].includes(flag + '_' + action)) {
+    console.log('Invalid flag:', flag + '_' + action);
+    return false;
+  }
+  if (!userId || !sub || !date || isNaN(Number(idxStr))) {
+    console.log('Invalid data:', { userId, sub, date, idxStr });
+    return false;
+  }
   return true;
 }
 
