@@ -266,9 +266,6 @@ client.on('interactionCreate', async interaction => {
         if (!validateSubject(sub)) {
           return interaction.reply('❌ 科目名稱無效或太長');
         }
-        if (!validateContent(content)) {
-          return interaction.reply('❌ 內容無效或太長');
-        }
 
         let added = 0;
         let errors = 0;
@@ -285,33 +282,44 @@ client.on('interactionCreate', async interaction => {
         // Filter out empty lines and process each line
         lines = lines.filter(line => line.trim());
         
-        for (const line of lines) {
-          // Split by any separator except commas, and trim each part
-          let [original, translation = ''] = line.split(/[|｜:：\t、/~]/).map(x => x.trim());
+        // Process in chunks of 20 lines to avoid Discord's message length limit
+        const chunkSize = 20;
+        for (let i = 0; i < lines.length; i += chunkSize) {
+          const chunk = lines.slice(i, i + chunkSize);
           
-          // If no separator found, try to split by space
-          if (!translation && original.includes(' ')) {
-            [original, translation] = original.split(/\s+/).map(x => x.trim());
+          for (const line of chunk) {
+            // Split by any separator except commas, and trim each part
+            let [original, translation = ''] = line.split(/[|｜:：\t、/~]/).map(x => x.trim());
+            
+            // If no separator found, try to split by space
+            if (!translation && original.includes(' ')) {
+              [original, translation] = original.split(/\s+/).map(x => x.trim());
+            }
+            
+            if (original) {
+              try {
+                await new Promise((resolve, reject) => {
+                  hoksip.addSentence(user.id, original, translation, sub, '', (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  });
+                });
+                added++;
+              } catch (err) {
+                console.error('Error adding sentence:', err);
+                errors++;
+              }
+            }
           }
           
-          if (original) {
-            try {
-              await new Promise((resolve, reject) => {
-                hoksip.addSentence(user.id, original, translation, sub, '', (err) => {
-                  if (err) reject(err);
-                  else resolve();
-                });
-              });
-              added++;
-            } catch (err) {
-              console.error('Error adding sentence:', err);
-              errors++;
-            }
+          // Send progress update for each chunk
+          if (i + chunkSize < lines.length) {
+            await interaction.followUp(`✅ 已處理 ${i + chunk.length} 筆，繼續處理中...`);
           }
         }
         
         await addPointWithStreak(user.id);
-        interaction.reply(`✅ 已新增 ${added} 筆到科目「${sub}」${errors > 0 ? `（${errors} 筆失敗）` : ''}`);
+        await interaction.reply(`✅ 已新增 ${added} 筆到科目「${sub}」${errors > 0 ? `（${errors} 筆失敗）` : ''}`);
       }
 
       // /review
