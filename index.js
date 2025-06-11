@@ -44,8 +44,19 @@ function displaySentence(row) {
 // 用戶資料同步
 const userFileLock = new Map();
 async function updateUserData(userId, updateFn) {
+  const LOCK_TIMEOUT = 30000; // 30 seconds timeout
   if (userFileLock.has(userId)) {
-    await userFileLock.get(userId);
+    try {
+      await Promise.race([
+        userFileLock.get(userId),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Lock timeout')), LOCK_TIMEOUT)
+        )
+      ]);
+    } catch (err) {
+      console.error('Lock timeout for user:', userId);
+      userFileLock.delete(userId);
+    }
   }
   let resolveLock;
   const lock = new Promise(resolve => {
@@ -58,6 +69,9 @@ async function updateUserData(userId, updateFn) {
     const result = await updateFn(users);
     fs.writeFileSync(userFile, JSON.stringify(users, null, 2));
     return result;
+  } catch (err) {
+    console.error('Error updating user data:', err);
+    throw err;
   } finally {
     userFileLock.delete(userId);
     resolveLock();
@@ -103,14 +117,26 @@ async function addPoint(userId) {
   });
 }
 
-// 打卡
+// Use consistent timezone
+function getTodayDate() {
+  const now = new Date();
+  return new Date(now.getTime() - (now.getTimezoneOffset() * 60000))
+    .toISOString()
+    .split('T')[0];
+}
+
+// Update point system to use consistent timezone
 async function addPointWithStreak(userId) {
   return updateUserData(userId, async (users) => {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = getTodayDate();
     if (!users[userId]) {
       users[userId] = {
-        points: 0, streakDay: 0, lastCheckInDate: '', todayBonusGiven: false, reviewBonusGiven: false, history: []
+        points: 0, 
+        streakDay: 0, 
+        lastCheckInDate: '', 
+        todayBonusGiven: false, 
+        reviewBonusGiven: false, 
+        history: []
       };
     }
     const user = users[userId];
@@ -127,7 +153,7 @@ async function addPointWithStreak(userId) {
       user.todayBonusGiven = true;
       user.lastCheckInDate = today;
     }
-    user.history.push({ timestamp: now.toISOString(), delta: 1 + bonus });
+    user.history.push({ timestamp: new Date().toISOString(), delta: 1 + bonus });
     return { points: user.points, streakDay: user.streakDay, bonusGiven: bonus };
   });
 }
@@ -267,6 +293,9 @@ client.on('interactionCreate', async interaction => {
           return interaction.reply('❌ 科目名稱無效或太長');
         }
 
+        // Send initial reply first
+        await interaction.reply('開始處理學習內容，請稍候...');
+
         let added = 0;
         let errors = 0;
         
@@ -313,7 +342,7 @@ client.on('interactionCreate', async interaction => {
         }
         
         await addPointWithStreak(user.id);
-        await interaction.reply(`✅ 已新增 ${added} 筆到科目「${sub}」${errors > 0 ? `（${errors} 筆失敗）` : ''}`);
+        await interaction.followUp(`✅ 已新增 ${added} 筆到科目「${sub}」${errors > 0 ? `（${errors} 筆失敗）` : ''}`);
       }
 
       // /review
@@ -536,6 +565,10 @@ client.on('interactionCreate', async interaction => {
 
 // ===== 輸出複習題卡 =====
 async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, isButtonInteraction) {
+  if (!batch || !batch.sentences || idx >= batch.sentences.length) {
+    await interaction.followUp({ content: '❌ 無效的複習內容' });
+    return;
+  }
   const row = batch.sentences[idx];
   const progress = Math.round((idx / batch.sentences.length) * 100);
   const progressBar = `[${'='.repeat(Math.floor(progress/10))}${progress%10 === 0 ? '' : '>'}${' '.repeat(10-Math.ceil(progress/10))}] ${progress}%`;
@@ -575,7 +608,7 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
   }
 }
 
-// Add automatic review reminders
+// Persist reminder scheduling
 function scheduleReviewReminders() {
   const now = new Date();
   const morning = new Date(now);
@@ -587,25 +620,44 @@ function scheduleReviewReminders() {
   const localMorning = new Date(morning.getTime() - (now.getTimezoneOffset() * 60000));
   const localEvening = new Date(evening.getTime() - (now.getTimezoneOffset() * 60000));
 
-  // Schedule morning reminder
-  if (now < localMorning) {
-    setTimeout(() => sendReviewReminders(), localMorning - now);
-  }
+  // Save next reminder time
+  const nextReminder = now < localMorning ? localMorning : 
+                      now < localEvening ? localEvening :
+                      new Date(localMorning.getTime() + 24 * 60 * 60 * 1000);
+  
+  fs.writeFileSync('./next_reminder.json', JSON.stringify({
+    nextReminder: nextReminder.toISOString()
+  }));
 
-  // Schedule evening reminder
-  if (now < localEvening) {
-    setTimeout(() => sendReviewReminders(), localEvening - now);
-  }
-
-  // Schedule next day's reminders
-  const nextDay = new Date(now);
-  nextDay.setDate(nextDay.getDate() + 1);
-  nextDay.setHours(9, 0, 0, 0);
-  const localNextDay = new Date(nextDay.getTime() - (now.getTimezoneOffset() * 60000));
+  // Schedule next reminder
+  const timeUntilNext = nextReminder - now;
   setTimeout(() => {
+    sendReviewReminders();
     scheduleReviewReminders();
-  }, localNextDay - now);
+  }, timeUntilNext);
 }
+
+// Load reminder schedule on startup
+client.once('ready', () => {
+  console.log(`🤖 ${client.user.tag} 已上線！`);
+  try {
+    if (fs.existsSync('./next_reminder.json')) {
+      const { nextReminder } = JSON.parse(fs.readFileSync('./next_reminder.json', 'utf8'));
+      const now = new Date();
+      const next = new Date(nextReminder);
+      if (next > now) {
+        setTimeout(() => {
+          sendReviewReminders();
+          scheduleReviewReminders();
+        }, next - now);
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Error loading reminder schedule:', err);
+  }
+  scheduleReviewReminders();
+});
 
 // Passive review reminder (without streak)
 async function sendReviewReminders() {
@@ -692,12 +744,6 @@ client.on('interactionCreate', async interaction => {
       });
     }
   }
-});
-
-// Start scheduling reminders when the bot is ready
-client.once('ready', () => {
-  console.log(`🤖 ${client.user.tag} 已上線！`);
-  scheduleReviewReminders();
 });
 
 client.login(process.env.TOKEN);
