@@ -467,7 +467,50 @@ client.on('interactionCreate', async interaction => {
                   else resolve();
                 });
               });
-              await interaction.update({ content: '🗑️ 已刪除此句', embeds: [], components: [] });
+              // Update the message to show deletion
+              await interaction.update({ 
+                content: '🗑️ 已刪除此句', 
+                embeds: [], 
+                components: [] 
+              });
+
+              // Check if there are more sentences in this batch
+              if (idx + 1 < batch.sentences.length) {
+                // Wait a moment before showing the next question
+                setTimeout(async () => {
+                  await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, null, true);
+                }, 1000);
+              } else {
+                // Check if there are more batches
+                const currentBatchIndex = batches.findIndex(b => b.date === date);
+                if (currentBatchIndex + 1 < batches.length) {
+                  // Wait a moment before showing the next batch
+                  setTimeout(async () => {
+                    const nextBatch = batches[currentBatchIndex + 1];
+                    await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true);
+                  }, 1000);
+                } else {
+                  // All batches are done
+                  setTimeout(async () => {
+                    const finalEmbed = new EmbedBuilder()
+                      .setTitle('✨ 複習結束！')
+                      .setDescription(`科目【${sub}】本批（${batch.date}）已複習完畢！`)
+                      .setFooter({ text: '點仔算 Tiamasng' });
+
+                    const finalRow = new ActionRowBuilder().addComponents(
+                      new ButtonBuilder()
+                        .setCustomId('review_done')
+                        .setLabel('結束')
+                        .setStyle(ButtonStyle.Primary)
+                    );
+
+                    await interaction.channel.send({ 
+                      embeds: [finalEmbed], 
+                      components: [finalRow] 
+                    });
+                  }, 1000);
+                }
+              }
             } else {
               await new Promise((resolve, reject) => {
                 hoksip.handleReviewResult(row.id, isCorrect, false, (err) => {  // false for active review
@@ -475,38 +518,45 @@ client.on('interactionCreate', async interaction => {
                   else resolve();
                 });
               });
-            }
 
-            // Check if there are more sentences in this batch
-            if (idx + 1 < batch.sentences.length) {
-              await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, null, true);
-            } else {
-              // Check if there are more batches
-              const currentBatchIndex = batches.findIndex(b => b.date === date);
-              if (currentBatchIndex + 1 < batches.length) {
-                // Move to next batch
-                const nextBatch = batches[currentBatchIndex + 1];
-                await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true);
+              // Check if there are more sentences in this batch
+              if (idx + 1 < batch.sentences.length) {
+                await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, null, true);
               } else {
-                // All batches are done
-                const finalEmbed = new EmbedBuilder()
-                  .setTitle('✨ 複習結束！')
-                  .setDescription(`科目【${sub}】本批（${batch.date}）已複習完畢！`)
-                  .setFooter({ text: '點仔算 Tiamasng' });
+                // Check if there are more batches
+                const currentBatchIndex = batches.findIndex(b => b.date === date);
+                if (currentBatchIndex + 1 < batches.length) {
+                  // Move to next batch
+                  const nextBatch = batches[currentBatchIndex + 1];
+                  await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true);
+                } else {
+                  // All batches are done
+                  const finalEmbed = new EmbedBuilder()
+                    .setTitle('✨ 複習結束！')
+                    .setDescription(`科目【${sub}】本批（${batch.date}）已複習完畢！`)
+                    .setFooter({ text: '點仔算 Tiamasng' });
 
-                const finalRow = new ActionRowBuilder().addComponents(
-                  new ButtonBuilder()
-                    .setCustomId('review_done')
-                    .setLabel('結束')
-                    .setStyle(ButtonStyle.Primary)
-                );
+                  const finalRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                      .setCustomId('review_done')
+                      .setLabel('結束')
+                      .setStyle(ButtonStyle.Primary)
+                  );
 
-                await interaction.update({ embeds: [finalEmbed], components: [finalRow] });
+                  await interaction.update({ 
+                    embeds: [finalEmbed], 
+                    components: [finalRow] 
+                  });
+                }
               }
             }
           } catch (err) {
             console.error('Error handling review result:', err);
-            await interaction.update({ content: '❌ 處理複習結果時發生錯誤', embeds: [], components: [] });
+            await interaction.update({ 
+              content: '❌ 處理複習結果時發生錯誤', 
+              embeds: [], 
+              components: [] 
+            });
           }
         });
       }
