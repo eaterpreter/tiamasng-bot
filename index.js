@@ -270,8 +270,11 @@ client.on('interactionCreate', async interaction => {
         let added = 0;
         let errors = 0;
         
-        // Split content by newlines and process each line
-        const lines = content.split(/\r?\n/).filter(line => line.trim());
+        // Split content by newlines and semicolons, then process each line
+        const lines = content
+          .split(/[\n;]/)  // Split by both newlines and semicolons
+          .map(line => line.trim())
+          .filter(line => line.length > 0);  // Remove empty lines
         
         // Process in chunks of 20 lines to avoid Discord's message length limit
         const chunkSize = 20;
