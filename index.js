@@ -439,34 +439,70 @@ client.on('interactionCreate', async interaction => {
       const id = interaction.customId;
       // Handle review buttons
       if (id.startsWith('review_yes_') || id.startsWith('review_no_') || id.startsWith('review_delete_')) {
-        const [flag, , userId, sub, date, idxStr] = id.split('_');
-        if (interaction.user.id !== userId) return interaction.reply({ 
-          content: '這不是你的複習！', 
-          flags: [64]
-        });
-        
-        const isCorrect = id.startsWith('review_yes_');
-        const isDelete = id.startsWith('review_delete_');
-        const idx = Number(idxStr);
+        if (!validateReviewButtonId(id)) {
+          return interaction.reply({ 
+            content: '❌ 無效的複習按鈕', 
+            flags: [64]
+          });
+        }
 
-        hoksip.getSentencesByDateBatches(userId, sub, async (err, batches) => {
-          if (err) {
-            console.error('Error getting batches:', err);
-            return interaction.reply('❌ 查詢失敗');
-          }
+        const [flag, , userId, sub, date, idxStr] = id.split('_');
+        if (interaction.user.id !== userId) {
+          return interaction.reply({ 
+            content: '這不是你的複習！', 
+            flags: [64]
+          });
+        }
+
+        // Check if user already has an active review
+        if (activeReviews.has(userId)) {
+          return interaction.reply({ 
+            content: '❌ 請先完成當前的複習', 
+            flags: [64]
+          });
+        }
+
+        // Mark review as active
+        activeReviews.set(userId, { sub, date, idx: Number(idxStr) });
+
+        try {
+          const batches = await Promise.race([
+            new Promise((resolve, reject) => {
+              hoksip.getSentencesByDateBatches(userId, sub, (err, batches) => {
+                if (err) reject(err);
+                else resolve(batches);
+              });
+            }),
+            timeout(5000) // 5 second timeout
+          ]);
+
           const batch = batches.find(b => b.date === date);
-          if (!batch) return interaction.reply('❌ 查無該日期內容！');
-          const row = batch.sentences[idx];
-          if (!row) return interaction.reply('❌ 查無該句內容！');
-          
+          if (!batch) {
+            activeReviews.delete(userId);
+            return interaction.reply('❌ 查無該日期內容！');
+          }
+
+          const row = batch.sentences[Number(idxStr)];
+          if (!row) {
+            activeReviews.delete(userId);
+            return interaction.reply('❌ 查無該句內容！');
+          }
+
+          const isCorrect = id.startsWith('review_yes_');
+          const isDelete = id.startsWith('review_delete_');
+
           try {
             if (isDelete) {
-              await new Promise((resolve, reject) => {
-                hoksip.deleteSentence(row.id, (err) => {
-                  if (err) reject(err);
-                  else resolve();
-                });
-              });
+              await Promise.race([
+                new Promise((resolve, reject) => {
+                  hoksip.deleteSentence(row.id, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  });
+                }),
+                timeout(5000)
+              ]);
+
               // Update the message to show deletion
               await interaction.update({ 
                 content: '🗑️ 已刪除此句', 
@@ -475,10 +511,15 @@ client.on('interactionCreate', async interaction => {
               });
 
               // Check if there are more sentences in this batch
-              if (idx + 1 < batch.sentences.length) {
+              if (Number(idxStr) + 1 < batch.sentences.length) {
                 // Wait a moment before showing the next question
                 setTimeout(async () => {
-                  await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, null, true);
+                  try {
+                    await sendReviewQuestion(interaction, userId, sub, Number(idxStr) + 1, batch, batches.length, null, true);
+                  } catch (err) {
+                    console.error('Error sending next question:', err);
+                    await interaction.channel.send('❌ 發送下一題時發生錯誤');
+                  }
                 }, 1000);
               } else {
                 // Check if there are more batches
@@ -486,42 +527,55 @@ client.on('interactionCreate', async interaction => {
                 if (currentBatchIndex + 1 < batches.length) {
                   // Wait a moment before showing the next batch
                   setTimeout(async () => {
-                    const nextBatch = batches[currentBatchIndex + 1];
-                    await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true);
+                    try {
+                      const nextBatch = batches[currentBatchIndex + 1];
+                      await sendReviewQuestion(interaction, userId, sub, 0, nextBatch, batches.length, null, true);
+                    } catch (err) {
+                      console.error('Error sending next batch:', err);
+                      await interaction.channel.send('❌ 發送下一批時發生錯誤');
+                    }
                   }, 1000);
                 } else {
                   // All batches are done
                   setTimeout(async () => {
-                    const finalEmbed = new EmbedBuilder()
-                      .setTitle('✨ 複習結束！')
-                      .setDescription(`科目【${sub}】本批（${batch.date}）已複習完畢！`)
-                      .setFooter({ text: '點仔算 Tiamasng' });
+                    try {
+                      const finalEmbed = new EmbedBuilder()
+                        .setTitle('✨ 複習結束！')
+                        .setDescription(`科目【${sub}】本批（${batch.date}）已複習完畢！`)
+                        .setFooter({ text: '點仔算 Tiamasng' });
 
-                    const finalRow = new ActionRowBuilder().addComponents(
-                      new ButtonBuilder()
-                        .setCustomId('review_done')
-                        .setLabel('結束')
-                        .setStyle(ButtonStyle.Primary)
-                    );
+                      const finalRow = new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                          .setCustomId('review_done')
+                          .setLabel('結束')
+                          .setStyle(ButtonStyle.Primary)
+                      );
 
-                    await interaction.channel.send({ 
-                      embeds: [finalEmbed], 
-                      components: [finalRow] 
-                    });
+                      await interaction.channel.send({ 
+                        embeds: [finalEmbed], 
+                        components: [finalRow] 
+                      });
+                    } catch (err) {
+                      console.error('Error sending completion message:', err);
+                      await interaction.channel.send('❌ 發送完成訊息時發生錯誤');
+                    }
                   }, 1000);
                 }
               }
             } else {
-              await new Promise((resolve, reject) => {
-                hoksip.handleReviewResult(row.id, isCorrect, false, (err) => {  // false for active review
-                  if (err) reject(err);
-                  else resolve();
-                });
-              });
+              await Promise.race([
+                new Promise((resolve, reject) => {
+                  hoksip.handleReviewResult(row.id, isCorrect, false, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  });
+                }),
+                timeout(5000)
+              ]);
 
               // Check if there are more sentences in this batch
-              if (idx + 1 < batch.sentences.length) {
-                await sendReviewQuestion(interaction, userId, sub, idx + 1, batch, batches.length, null, true);
+              if (Number(idxStr) + 1 < batch.sentences.length) {
+                await sendReviewQuestion(interaction, userId, sub, Number(idxStr) + 1, batch, batches.length, null, true);
               } else {
                 // Check if there are more batches
                 const currentBatchIndex = batches.findIndex(b => b.date === date);
@@ -557,8 +611,18 @@ client.on('interactionCreate', async interaction => {
               embeds: [], 
               components: [] 
             });
+          } finally {
+            // Clear active review state
+            activeReviews.delete(userId);
           }
-        });
+        } catch (err) {
+          console.error('Error in review process:', err);
+          activeReviews.delete(userId);
+          await interaction.reply({ 
+            content: '❌ 複習過程發生錯誤，請重試', 
+            flags: [64]
+          });
+        }
       }
       // 結束按鈕
       else if (interaction.customId === 'review_done') {
@@ -599,6 +663,9 @@ client.on('interactionCreate', async interaction => {
             });
           } catch (updateErr) {
             console.error('Error updating message:', updateErr);
+          } finally {
+            // Clear active review state
+            activeReviews.delete(interaction.user.id);
           }
         }
       }
@@ -616,7 +683,11 @@ client.on('interactionCreate', async interaction => {
 // ===== 輸出複習題卡 =====
 async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, isButtonInteraction) {
   if (!batch || !batch.sentences || idx >= batch.sentences.length) {
-    await interaction.followUp({ content: '❌ 無效的複習內容' });
+    if (isButtonInteraction) {
+      await interaction.channel.send({ content: '❌ 無效的複習內容' });
+    } else {
+      await interaction.followUp({ content: '❌ 無效的複習內容' });
+    }
     return;
   }
   const row = batch.sentences[idx];
@@ -647,14 +718,26 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
 
   try {
     if (isButtonInteraction) {
-      await interaction.update({ embeds: [embed], components: [rowBtn] });
+      // For button interactions, send a new message instead of updating
+      await interaction.channel.send({ 
+        embeds: [embed], 
+        components: [rowBtn] 
+      });
     } else {
-      await interaction.followUp({ embeds: [embed], components: [rowBtn] });
+      // For initial command, use followUp
+      await interaction.followUp({ 
+        embeds: [embed], 
+        components: [rowBtn] 
+      });
     }
     if (batchFinishCallback) interaction._batchFinishCallback = batchFinishCallback;
   } catch (err) {
     console.error('Error sending review question:', err);
-    await interaction.followUp({ content: '❌ 發送複習題目時發生錯誤' });
+    if (isButtonInteraction) {
+      await interaction.channel.send({ content: '❌ 發送複習題目時發生錯誤' });
+    } else {
+      await interaction.followUp({ content: '❌ 發送複習題目時發生錯誤' });
+    }
   }
 }
 
@@ -795,5 +878,25 @@ client.on('interactionCreate', async interaction => {
     }
   }
 });
+
+// Add state management for review sessions
+const activeReviews = new Map();
+
+// Add timeout promise
+function timeout(ms) {
+  return new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Operation timed out')), ms)
+  );
+}
+
+// Add validation for review button IDs
+function validateReviewButtonId(id) {
+  const parts = id.split('_');
+  if (parts.length !== 6) return false;
+  const [flag, , userId, sub, date, idxStr] = parts;
+  if (!['review_yes', 'review_no', 'review_delete'].includes(flag)) return false;
+  if (!userId || !sub || !date || isNaN(Number(idxStr))) return false;
+  return true;
+}
 
 client.login(process.env.TOKEN);
