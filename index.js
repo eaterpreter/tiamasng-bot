@@ -270,17 +270,8 @@ client.on('interactionCreate', async interaction => {
         let added = 0;
         let errors = 0;
         
-        // First try to split by explicit line breaks
-        let lines = content.split(/\r?\n/);
-        
-        // If no explicit line breaks found, try to detect natural line breaks
-        if (lines.length === 1) {
-          // Look for patterns like "word (reading) translation" or "word translation"
-          lines = content.match(/[^\n]+?(?=\s*[^\n]+?(?:\s|$))/g) || [content];
-        }
-        
-        // Filter out empty lines and process each line
-        lines = lines.filter(line => line.trim());
+        // Split content by newlines and process each line
+        const lines = content.split(/\r?\n/).filter(line => line.trim());
         
         // Process in chunks of 20 lines to avoid Discord's message length limit
         const chunkSize = 20;
