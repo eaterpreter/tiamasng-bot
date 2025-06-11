@@ -684,7 +684,11 @@ client.on('interactionCreate', async interaction => {
 async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBatches, batchFinishCallback, isButtonInteraction) {
   if (!batch || !batch.sentences || idx >= batch.sentences.length) {
     if (isButtonInteraction) {
-      await interaction.channel.send({ content: '❌ 無效的複習內容' });
+      await interaction.update({ 
+        content: '❌ 無效的複習內容',
+        embeds: [],
+        components: []
+      });
     } else {
       await interaction.followUp({ content: '❌ 無效的複習內容' });
     }
@@ -718,8 +722,8 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
 
   try {
     if (isButtonInteraction) {
-      // For button interactions, send a new message instead of updating
-      await interaction.channel.send({ 
+      // For button interactions, update the existing message
+      await interaction.update({ 
         embeds: [embed], 
         components: [rowBtn] 
       });
@@ -734,7 +738,11 @@ async function sendReviewQuestion(interaction, userId, sub, idx, batch, totalBat
   } catch (err) {
     console.error('Error sending review question:', err);
     if (isButtonInteraction) {
-      await interaction.channel.send({ content: '❌ 發送複習題目時發生錯誤' });
+      await interaction.update({ 
+        content: '❌ 發送複習題目時發生錯誤',
+        embeds: [],
+        components: []
+      });
     } else {
       await interaction.followUp({ content: '❌ 發送複習題目時發生錯誤' });
     }
