@@ -62,15 +62,10 @@ process.on('SIGINT', () => {
   }
 });
 
-// Convert callback-based functions to promises
-const runAsync = promisify(db.run.bind(db));
-const getAsync = promisify(db.get.bind(db));
-const allAsync = promisify(db.all.bind(db));
-
 // Initialize database schema
 async function initSchema() {
   try {
-    await runAsync(`
+    await db.run(`
       CREATE TABLE IF NOT EXISTS sentences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
@@ -89,8 +84,8 @@ async function initSchema() {
     `);
     
     // Create indexes for better query performance
-    await runAsync('CREATE INDEX IF NOT EXISTS idx_user_sub ON sentences(user_id, sub)');
-    await runAsync('CREATE INDEX IF NOT EXISTS idx_next_date ON sentences(next_date)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_user_sub ON sentences(user_id, sub)');
+    await db.run('CREATE INDEX IF NOT EXISTS idx_next_date ON sentences(next_date)');
     
     console.log('✅ sentences 資料表已初始化');
   } catch (err) {
@@ -98,6 +93,25 @@ async function initSchema() {
     throw err;
   }
 }
+
+// Initialize database and create promisified functions
+let runAsync, getAsync, allAsync;
+
+async function initialize() {
+  await initDB();
+  await initSchema();
+  
+  // Create promisified versions after db is initialized
+  runAsync = promisify(db.run.bind(db));
+  getAsync = promisify(db.get.bind(db));
+  allAsync = promisify(db.all.bind(db));
+}
+
+// Call initialize immediately
+initialize().catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
+});
 
 const hoksip = {
   // Add sentence with proper validation
@@ -203,7 +217,7 @@ const hoksip = {
     }
 
     db.get(
-      `SELECT yesCount FROM sentences WHERE id = ?`,
+      `SELECT yesCount, user_id, sub FROM sentences WHERE id = ?`,
       [sentence_id],
       (err, row) => {
         if (err) {
@@ -229,15 +243,8 @@ const hoksip = {
 
         // If yesCount reaches 6, mark as mastered and delete the sentence
         if (yesCount >= 6) {
-          db.run('UPDATE subjects SET mastered = mastered + 1 WHERE user_id = ? AND sub = ?',
-            [row.user_id, row.sub], function(err) {
-              if (err) {
-                console.error('Error updating mastered count:', err);
-                return callback(err);
-              }
-              // Delete the sentence
-              db.run('DELETE FROM sentences WHERE id = ?', [sentence_id], callback);
-            });
+          // Simply delete the sentence when mastered
+          db.run('DELETE FROM sentences WHERE id = ?', [sentence_id], callback);
         } else {
           db.run(
             `UPDATE sentences 
@@ -245,8 +252,7 @@ const hoksip = {
                  exe_date = ?, 
                  next_date = ?, 
                  review_count = review_count + 1,
-                 success_count = success_count + ?,
-                 updated_at = CURRENT_TIMESTAMP
+                 success_count = success_count + ?
              WHERE id = ?`,
             [yesCount, today, next_date, is_correct ? 1 : 0, sentence_id],
             (err) => {
@@ -279,38 +285,39 @@ const hoksip = {
     );
   },
 
-  // Get stats with error handling
+  // Get stats with proper error handling
   getStats(user_id, callback) {
     if (!validateUserId(user_id)) {
       return callback(new Error('Invalid user_id'), null);
     }
 
-    db.all(
-      `SELECT sub, yesCount FROM sentences WHERE user_id = ?`,
-      [user_id],
-      (err, rows) => {
-        if (err) {
-          console.error('Error getting stats:', err);
-          return callback(err);
-        }
-
-        try {
-          const result = {};
-          for (let row of rows) {
-            if (!result[row.sub]) {
-              result[row.sub] = { not_familiar: 0, vague: 0, mastered: 0 };
-            }
-            if (row.yesCount <= 2) result[row.sub].not_familiar++;
-            else if (row.yesCount <= 5) result[row.sub].vague++;
-            else result[row.sub].mastered++;
-          }
-          callback(null, result);
-        } catch (err) {
-          console.error('Error processing stats:', err);
-          callback(err);
-        }
+    db.all(`
+      SELECT 
+        sub,
+        COUNT(CASE WHEN yesCount >= 6 THEN 1 END) as mastered,
+        COUNT(CASE WHEN yesCount >= 3 AND yesCount < 6 THEN 1 END) as familiar,
+        COUNT(CASE WHEN yesCount > 0 AND yesCount < 3 THEN 1 END) as not_familiar,
+        COUNT(CASE WHEN yesCount = 0 THEN 1 END) as vague
+      FROM sentences 
+      WHERE user_id = ? 
+      GROUP BY sub
+    `, [user_id], (err, rows) => {
+      if (err) {
+        console.error('Error getting stats:', err);
+        return callback(err, null);
       }
-    );
+
+      const stats = {};
+      rows.forEach(row => {
+        stats[row.sub] = {
+          mastered: row.mastered || 0,
+          familiar: row.familiar || 0,
+          not_familiar: row.not_familiar || 0,
+          vague: row.vague || 0
+        };
+      });
+      callback(null, stats);
+    });
   },
 
   // Get user subjects with validation
@@ -342,45 +349,7 @@ const hoksip = {
       }
       callback(null);
     });
-  },
-
-  // Update getStats to include mastered count
-  getStats(userId, callback) {
-    db.all(`
-      SELECT 
-        sub,
-        COUNT(CASE WHEN yes_count >= 6 THEN 1 END) as mastered,
-        COUNT(CASE WHEN yes_count < 6 AND (yes_count + no_count) >= 3 AND (yes_count / (yes_count + no_count)) >= 0.7 THEN 1 END) as familiar,
-        COUNT(CASE WHEN yes_count < 6 AND (yes_count + no_count) >= 3 AND (yes_count / (yes_count + no_count)) < 0.7 THEN 1 END) as not_familiar,
-        COUNT(CASE WHEN yes_count < 6 AND (yes_count + no_count) < 3 THEN 1 END) as vague
-      FROM sentences 
-      WHERE user_id = ? 
-      GROUP BY sub
-    `, [userId], function(err, rows) {
-      if (err) {
-        console.error('Error getting stats:', err);
-        return callback(err);
-      }
-      const stats = {};
-      rows.forEach(row => {
-        stats[row.sub] = {
-          mastered: row.mastered || 0,
-          familiar: row.familiar || 0,
-          not_familiar: row.not_familiar || 0,
-          vague: row.vague || 0
-        };
-      });
-      callback(null, stats);
-    });
   }
 };
-
-// Initialize database on startup
-initDB()
-  .then(initSchema)
-  .catch(err => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-  });
 
 module.exports = hoksip;
