@@ -1,9 +1,9 @@
 {
   "417737364396572672": {
-    "points": 52,
-    "streakDay": 2,
-    "lastCheckInDate": "2025-06-11",
-    "todayBonusGiven": false,
+    "points": 55,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-06-16",
+    "todayBonusGiven": true,
     "history": [
       {
         "timestamp": "2025-05-16T07:43:06.885Z",
@@ -168,9 +168,28 @@
       {
         "timestamp": "2025-06-11T08:20:35.590Z",
         "delta": 1
+      },
+      {
+        "timestamp": "2025-06-16T07:20:38.359Z",
+        "delta": 1,
+        "action": "review"
       }
     ],
-    "reviewBonusGiven": false
+    "reviewBonusGiven": false,
+    "cooldowns": {
+      "review": 300000,
+      "audio": 300000,
+      "test": 300000,
+      "study": 300000,
+      "race": 300000
+    },
+    "lastActionTime": {
+      "review": 1750058438359,
+      "audio": 0,
+      "test": 0,
+      "study": 0,
+      "race": 0
+    }
   },
   "370210449037459476": {
     "points": 1,
