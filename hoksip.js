@@ -472,14 +472,20 @@ async function handleCommand(interaction) {
       }
       if (!batches.length) return interaction.followUp('目前沒有任何內容可以複習！');
       
-      // Sort batches by review count and date
+      // Sort sentences within each batch by review_count (least reviewed first)
+      batches.forEach(batch => {
+        batch.sentences.sort((a, b) => {
+          const aCount = a.review_count || 0;
+          const bCount = b.review_count || 0;
+          return aCount - bCount;  // Sort by review_count ascending
+        });
+      });
+      
+      // Sort batches by average review_count
       batches.sort((a, b) => {
         const aAvgReviewCount = a.sentences.reduce((sum, s) => sum + (s.review_count || 0), 0) / a.sentences.length;
         const bAvgReviewCount = b.sentences.reduce((sum, s) => sum + (s.review_count || 0), 0) / b.sentences.length;
-        if (aAvgReviewCount !== bAvgReviewCount) {
-          return aAvgReviewCount - bAvgReviewCount;
-        }
-        return new Date(b.date) - new Date(a.date);
+        return aAvgReviewCount - bAvgReviewCount;  // Sort by average review_count ascending
       });
       
       // Mark review as active and store batches
