@@ -1,6 +1,6 @@
 {
   "417737364396572672": {
-    "points": 55,
+    "points": 87,
     "streakDay": 1,
     "lastCheckInDate": "2025-06-16",
     "todayBonusGiven": true,
@@ -170,48 +170,273 @@
         "delta": 1
       },
       {
-        "timestamp": "2025-06-16T07:20:38.359Z",
-        "delta": 1,
-        "action": "review"
+        "timestamp": "2025-06-11T09:00:02.260Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T13:44:05.372Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:03:32.328Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:04:30.842Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:17:50.970Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:18:15.732Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:34:09.147Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:37:25.442Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:47:35.166Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:48:45.820Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:49:05.750Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:50:09.513Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T14:51:02.018Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:08:10.066Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:08:27.087Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:10:47.377Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:35:15.692Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:37:33.524Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:38:15.850Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:38:44.896Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:41:03.977Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:46:51.753Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T17:42:14.922Z",
+        "delta": 2
+      },
+      {
+        "timestamp": "2025-06-11T21:00:03.150Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T09:00:02.864Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T21:00:03.052Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T05:34:30.511Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T09:00:03.213Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T21:00:03.005Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-14T09:00:02.971Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-14T21:00:03.296Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-15T09:00:02.923Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-15T21:00:03.126Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-16T03:54:03.083Z",
+        "delta": 1
       }
     ],
-    "reviewBonusGiven": false,
-    "cooldowns": {
-      "review": 300000,
-      "audio": 300000,
-      "test": 300000,
-      "study": 300000,
-      "race": 300000
-    },
-    "lastActionTime": {
-      "review": 1750058438359,
-      "audio": 0,
-      "test": 0,
-      "study": 0,
-      "race": 0
-    }
+    "reviewBonusGiven": false
   },
   "370210449037459476": {
-    "points": 1,
+    "points": 15,
     "streakDay": 1,
-    "lastCheckInDate": "2025-05-21",
+    "lastCheckInDate": "2025-06-11",
     "todayBonusGiven": false,
     "history": [
       {
         "timestamp": "2025-05-21T13:48:56.602Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:17:27.215Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:18:16.442Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:19:02.700Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:20:02.344Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:40:24.734Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T21:00:03.541Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T09:00:03.241Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T21:00:03.450Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T09:00:03.637Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T21:00:03.368Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-14T09:00:03.313Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-14T21:00:03.782Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-15T09:00:03.434Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-15T21:00:03.529Z",
         "delta": 1
       }
     ],
     "reviewBonusGiven": false
   },
   "339807243409293312": {
-    "points": 1,
-    "streakDay": 1,
-    "lastCheckInDate": "2025-06-04",
+    "points": 14,
+    "streakDay": 2,
+    "lastCheckInDate": "2025-06-12",
     "todayBonusGiven": false,
     "history": [
       {
         "timestamp": "2025-06-04T13:24:01.085Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:41:20.159Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:49:15.167Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:50:58.234Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T21:00:03.896Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T05:33:56.900Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T09:00:03.644Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-12T21:00:03.772Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T09:00:03.963Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-13T21:00:03.651Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-14T09:00:03.630Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-14T21:00:04.114Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-15T09:00:03.870Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-15T21:00:04.072Z",
         "delta": 1
       }
     ],
@@ -255,5 +480,26 @@
       }
     ],
     "reviewBonusGiven": false
+  },
+  "742034417572249643": {
+    "points": 3,
+    "streakDay": 1,
+    "lastCheckInDate": "2025-06-11",
+    "todayBonusGiven": false,
+    "reviewBonusGiven": false,
+    "history": [
+      {
+        "timestamp": "2025-06-11T15:21:12.960Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:34:44.135Z",
+        "delta": 1
+      },
+      {
+        "timestamp": "2025-06-11T15:49:38.199Z",
+        "delta": 1
+      }
+    ]
   }
 }
