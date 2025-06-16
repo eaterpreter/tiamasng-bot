@@ -806,6 +806,9 @@ client.on('interactionCreate', async interaction => {
       }
       // 結束按鈕
       else if (action === 'review_done') {
+        // Clear active review state immediately
+        activeReviews.delete(interaction.user.id);
+        
         try {
           // Add points only when user clicks the done button
           const result = await addPointWithStreak(interaction.user.id, 'review');
@@ -851,9 +854,6 @@ client.on('interactionCreate', async interaction => {
             }
           } catch (updateErr) {
             console.error('Error updating message:', updateErr);
-          } finally {
-            // Clear active review state
-            activeReviews.delete(interaction.user.id);
           }
         }
       }
